@@ -16,5 +16,5 @@ on top of a shared-buffer switch architecture.
 
 ## License
 
-This project is released under the **MIT License** (or **BSD-3-Clause License**).
+This project is released under the **MIT License**.
 
