@@ -9,7 +9,7 @@
 // Description:      Shared buffer core for packet switching with ATS support
 //////////////////////////////////////////////////////////////////////////////////
 
-module shared_buffer_core #( 
+module shared_buffer_core #(
     parameter NUM_PORT = 4,
     parameter TIMESTAMP_WIDTH = 59
   ) (
@@ -51,7 +51,7 @@ module shared_buffer_core #(
   reg [8:0]                           FQ_dout;
   reg                                 sram_rd;
   reg [3:0]                           rd_state;
-  reg [3:0]                           wr_state;
+  reg [4:0]                           wr_state;
   reg [3:0]                           input_metadata_wr_en;
   reg [20:0]                          in_metadata;
   reg [31:0]                          flow_id[NUM_PORT-1:0];
@@ -154,6 +154,10 @@ module shared_buffer_core #(
   //================================================================
   // Write State Machine
   //================================================================
+
+  //================================================================
+  // Write State Machine
+  //================================================================
   always @(posedge clk)
   begin
     if (reset)
@@ -214,33 +218,11 @@ module shared_buffer_core #(
       case (wr_state)
         0:
         begin
-          sram_cnt_a <= 0;
-          if (qm_portmap[0])
-          begin
-            flow_id[0]     <= i_cell_ptr_fifo_dout[54:23];
-            group_id_in[0] <= i_cell_ptr_fifo_dout[61:58];
-          end
-          else if (qm_portmap[1])
-          begin
-            flow_id[1]     <= i_cell_ptr_fifo_dout[54:23];
-            group_id_in[1] <= i_cell_ptr_fifo_dout[61:58];
-          end
-          else if (qm_portmap[2])
-          begin
-            flow_id[2]     <= i_cell_ptr_fifo_dout[54:23];
-            group_id_in[2] <= i_cell_ptr_fifo_dout[61:58];
-          end
-          else if (qm_portmap[3])
-          begin
-            flow_id[3]     <= i_cell_ptr_fifo_dout[54:23];
-            group_id_in[3] <= i_cell_ptr_fifo_dout[61:58];
-          end
-
           if (!i_cell_ptr_fifo_empty & !qm_ptr_full & !FQ_empty)
           begin
             arrival_time                <= local_clock[TIMESTAMP_WIDTH-1:0];
-            i_cell_ptr_fifo_rd          <= 1;
-            start_flag                  <= i_cell_ptr_fifo_dout[11:8];
+            // i_cell_ptr_fifo_rd          <= 1;
+            start_flag[3:0]                  <= i_cell_ptr_fifo_dout[11:8];
             qm_portmap[3:0]             <= i_cell_ptr_fifo_dout[11:8];
             pcp_reg                     <= i_cell_ptr_fifo_dout[57:55];
             group_id_reg_reg            <= i_cell_ptr_fifo_dout[61:58];
@@ -253,31 +235,53 @@ module shared_buffer_core #(
             valid[3:0]                  <= i_cell_ptr_fifo_dout[15:12];
             i_cell_first                <= 1;
             port_map[2:0]            <= i_cell_ptr_fifo_dout[8]?0:i_cell_ptr_fifo_dout[9]? 1:i_cell_ptr_fifo_dout[10]?2:3;
+            flow_id[0]     <= i_cell_ptr_fifo_dout[54:23];
+            group_id_in[0] <= i_cell_ptr_fifo_dout[61:58];
+            flow_id[1]     <= i_cell_ptr_fifo_dout[54:23];
+            group_id_in[1] <= i_cell_ptr_fifo_dout[61:58];
+
+            flow_id[2]     <= i_cell_ptr_fifo_dout[54:23];
+            group_id_in[2] <= i_cell_ptr_fifo_dout[61:58];
+
+            flow_id[3]     <= i_cell_ptr_fifo_dout[54:23];
+            group_id_in[3] <= i_cell_ptr_fifo_dout[61:58];
             if (i_cell_ptr_fifo_dout[7:3] == 'd1)
               i_cell_last <= 1;
+            wr_state                <= 'hc;
+          end
+        end
 
-            if (frame_eligible_time_OK[port_map] && ~frame_discard_flag[port_map])
-            begin
-              wr_state                <= 1;
-              start_flag              <= 0;
-              read_end_flag           <= 1;
-              FQ_rd                   <= 1;
-              i_cell_data_fifo_rd     <= 1;
-              i_cell_ptr_fifo_rd      <= 1;
-            end
-            else if (frame_discard_flag[port_map])
-            begin
-              wr_state                <= 9;
-              cell_number             <= cell_number;
-              start_flag              <= 0;
-              read_end_flag           <= 1;
-              i_cell_ptr_fifo_rd      <= 1;
-            end
-            else
-            begin
-              wr_state                <= 0;
-              i_cell_ptr_fifo_rd      <= 0;
-            end
+
+        'hc:
+        begin
+          sram_cnt_a <= 0;
+          wr_state                <= 'hd;
+
+        end
+
+        'hd:
+        begin
+          start_flag<=0;
+          if (frame_eligible_time_OK[port_map] && ~frame_discard_flag[port_map])
+          begin
+            read_end_flag           <= 1;
+            FQ_rd                   <= 1;
+            i_cell_data_fifo_rd     <= 1;
+            i_cell_ptr_fifo_rd      <= 1;
+            wr_state                <= 1;
+          end
+          else if (frame_discard_flag[port_map])
+          begin
+            wr_state                <= 9;
+            cell_number             <= cell_number;
+            start_flag              <= 0;
+            read_end_flag           <= 1;
+            i_cell_ptr_fifo_rd      <= 1;
+          end
+          else
+          begin
+            wr_state                <= 'hd;
+            i_cell_ptr_fifo_rd      <= 0;
           end
         end
 
@@ -413,7 +417,6 @@ module shared_buffer_core #(
       endcase
     end
   end
-
   //================================================================
   // Read State Machine
   //================================================================

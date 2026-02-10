@@ -2,37 +2,35 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Company:         TSN@NNS
 // Engineer:        Wenxue Wu
-//
 // Create Date:     2024/07/15
 // Design Name:     Flow Entry Manager
 // Module Name:     flow_entry_manager
-// Project Name:    ATS_with_mult_queue_v11
+// Project Name:    ATS_with_mult_queue_v13
 // Target Devices:  ZYNQ
 // Tool Versions:   VIVADO 2023.2
 // Description:     This module manages flow entries using RAM-based storage.
 //                  It provides flow parameter lookup and update functionality
 //                  with support for multiple groups and flows per group.
-//
 // Dependencies:    flow_para_ram.v
 //
 // Revision:     v1.0
 // Revision 0.01 - File Created
 // Additional Comments:
 //
-//////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////
 
 module flow_entry_manager#(
-        parameter       MATCH_ADDR_WIDTH = 8,    // 8Î»µØÖ·£¬Ö§³Ö12×é¡Á16¸öflow = 192¸öÌõÄ¿
-        parameter       NUM_FLOW         = 16,   // Ã¿×é16¸öflow
-        parameter       GROUP_NUMBER     = 12,
+        parameter       MATCH_ADDR_WIDTH = 9,    // 9Î»ï¿½ï¿½Ö·ï¿½ï¿½Ö§ï¿½ï¿½24ï¿½ï¿½ï¿½16ï¿½ï¿½flow = 384ï¿½ï¿½ï¿½ï¿½Ä¿
+        parameter       NUM_FLOW         = 16,   // Ã¿ï¿½ï¿½16ï¿½ï¿½flow
+        parameter       GROUP_NUMBER     = 24,   // Ö§ï¿½ï¿½24ï¿½ï¿½ï¿½ï¿½ (0-23)
         parameter       TIME_WIDTH       = 59,
-        parameter       CAM_ENTRY_WIDTH  = 123   // ±£³ÖÓëÔ­CAMÒ»ÖÂ£¬°üº¬flow_id×Ö¶Î
+        parameter       CAM_ENTRY_WIDTH  = 123   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô­CAMÒ»ï¿½Â£ï¿½ï¿½ï¿½ï¿½ï¿½flow_idï¿½Ö¶ï¿½
     )(
         input  wire                  clk,
         input  wire                  reset,
         input  wire [31:0]           flow_id,
         input  wire                  update_flag,
-        input  wire [3:0]            group_id,
+        input  wire [4:0]            group_id,
         input  wire                  start_match_flag,
         input  wire [TIME_WIDTH-1:0] update_bucket_empty_time,
         input  wire [TIME_WIDTH-1:0] update_group_eligibility_time,
@@ -46,10 +44,10 @@ module flow_entry_manager#(
 
     /***************function**************/
     function [MATCH_ADDR_WIDTH-1:0] calc_addr;
-        input [3:0] group;
+        input [4:0] group;
         input [3:0] flow_index;
         begin
-            calc_addr = {group, flow_index};  // ¼òµ¥Æ´½Ó£º¸ß4Î»group£¬µÍ4Î»flow_index
+            calc_addr = {group, flow_index};  // Æ´ï¿½Ó£ï¿½ï¿½ï¿½5Î»groupï¿½ï¿½ï¿½ï¿½4Î»flow_index
         end
     endfunction
 
@@ -112,7 +110,7 @@ module flow_entry_manager#(
             addra <= 0;
             dina <= 0;
 
-            // ³õÊ¼»¯ËùÓÐgroup¼Ä´æÆ÷
+            // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½groupï¿½Ä´ï¿½ï¿½ï¿½
             for (i = 0; i < GROUP_NUMBER; i = i + 1) begin
                 group_max_residence_time[i] <= {TIME_WIDTH{1'b0}};
                 group_eligibility_time_reg[i] <= {TIME_WIDTH{1'b0}};
@@ -125,22 +123,22 @@ module flow_entry_manager#(
                         wea <= 1'b1;
                         addra <= init_addr_counter;
 
-                        // Ê¹ÓÃµØÖ·¼ÆËãÀ´³õÊ¼»¯ÌØ¶¨Î»ÖÃ
+                        // Ê¹ï¿½Ãµï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ø¶ï¿½Î»ï¿½ï¿½
                         case(init_addr_counter)
                             // Group 3, flow_index 7: flow_id 0x007
-                            // calc_addr(4'd3, 4'h7): dina <= {59'h0, 32'd40000, 32'd512};
+                            // calc_addr(5'd3, 4'h7): dina <= {59'h0, 32'd40000, 32'd512};
                             // Group 7, flow_index 0-3: flow_id 0x000-0x003
-                            // calc_addr(4'd7, 4'h0): dina <= {59'h0, 32'd40000, 32'd512};    // 200Mbps
-                            // calc_addr(4'd7, 4'h1): dina <= {59'h0, 32'd80000, 32'd512};    //100Mbps
-                            // calc_addr(4'd7, 4'h2): dina <= {59'h0, 32'd320000, 32'd1600};  //  25Mbps
-                            calc_addr(4'd7, 4'h3): dina <= {59'h0, 32'd8000, 32'd3200};  //  50Mbps
+                            // calc_addr(5'd7, 4'h0): dina <= {59'h0, 32'd40000, 32'd512};    // 200Mbps
+                            // calc_addr(5'd7, 4'h1): dina <= {59'h0, 32'd80000, 32'd512};    //100Mbps
+                            // calc_addr(5'd7, 4'h2): dina <= {59'h0, 32'd320000, 32'd1600};  //  25Mbps
+                            calc_addr(5'd11, 4'h3): dina <= {59'h0, 32'd320000, 32'd3200};  //  50Mbps
                             // Group 8, flow_index 4-5: flow_id 0x004-0x005
-                            calc_addr(4'd8, 4'h4): dina <= {59'h0, 32'd160000, 32'd3200};   //  25Mbps
-                            // calc_addr(4'd8, 4'h5): dina <= {59'h0, 32'd80000, 32'd512};    // 100Mbps
+                            calc_addr(5'd8, 4'h4): dina <= {59'h0, 32'd160000, 32'd3200};   //  25Mbps
+                            // calc_addr(5'd8, 4'h5): dina <= {59'h0, 32'd80000, 32'd512};    // 100Mbps
                             // Group 9, flow_index 4-5: flow_id 0x004-0x005
-                            calc_addr(4'd9, 4'h4): dina <= {59'h0, 32'd320000, 32'd3200};    // 100Mbps
+                            calc_addr(5'd9, 4'h4): dina <= {59'h0, 32'd320000, 32'd3200};    // 100Mbps
                             // Group 9, flow_index 0-3: flow_id 0x000
-                            // ÆäËûµØÖ·³õÊ¼»¯Îª0
+                            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½Ê¼ï¿½ï¿½Îª0
                             default:
                                 dina <= 0;
                         endcase
@@ -165,34 +163,34 @@ module flow_entry_manager#(
 
                     if (update_flag) begin
                         state <= UPDATING;
-                        addra <= calc_addr(group_id, flow_id[3:0]);  // ¼ÆËã¸üÐÂµØÖ·
+                        addra <= calc_addr(group_id, flow_id[3:0]);  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½Ö·
                     end
                     else if (start_match_flag) begin
                         state <= 5;
-                        addra <= calc_addr(group_id, flow_id[3:0]);  // ¼ÆËãËÑË÷µØÖ·
+                        addra <= calc_addr(group_id, flow_id[3:0]);  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·
                     end
                 end
 
-                5:  // RAM¶ÁÈ¡ÑÓ³ÙÖÜÆÚ1
+                5:  // RAMï¿½ï¿½È¡ï¿½Ó³ï¿½ï¿½ï¿½ï¿½ï¿½1
                 begin
                     state <= 6;
                 end
 
-                6:  // RAM¶ÁÈ¡ÑÓ³ÙÖÜÆÚ2
+                6:  // RAMï¿½ï¿½È¡ï¿½Ó³ï¿½ï¿½ï¿½ï¿½ï¿½2
                 begin
                     state <= 7;
                 end
 
-                7:  // RAM¶ÁÈ¡ÑÓ³ÙÖÜÆÚ3
+                7:  // RAMï¿½ï¿½È¡ï¿½Ó³ï¿½ï¿½ï¿½ï¿½ï¿½3
                 begin
                     state <= SEARCHING;
                 end
 
                 UPDATING: begin
-                    // ¸üÐÂ²Ù×÷£ºÖ±½ÓµØÖ··ÃÎÊ
+                    // ï¿½ï¿½ï¿½Â²ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½Óµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
                     wea <= 1'b1;
                     addra <= calc_addr(group_id, flow_id[3:0]);
-                    // Ö»¸üÐÂbucket_empty_time×Ö¶Î£¬±£³ÖÆäËû×Ö¶Î²»±ä
+                    // Ö»ï¿½ï¿½ï¿½ï¿½bucket_empty_timeï¿½Ö¶Î£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¶Î²ï¿½ï¿½ï¿½
                     dina <= {update_bucket_empty_time, douta[63:0]};
                     group_eligibility_time_reg[group_id] <= update_group_eligibility_time;
                     state <= IDLE;
